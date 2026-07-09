@@ -69,6 +69,47 @@ npx skills add https://github.com/Leonxlnx/taste-skill --skill "design-taste-fro
 
 You can also copy any `SKILL.md` into your project or paste it into ChatGPT / Codex conversations.
 
+### Claude Code plugin marketplace
+
+This repo is also a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces). Add it once, then install the full bundle or individual skills as plugins:
+
+```
+/plugin marketplace add hestudy/taste-skill-claude-marketplace
+```
+
+Install everything in one plugin:
+
+```
+/plugin install taste-skill@taste-skill
+```
+
+Or install exactly the skills you want:
+
+```
+/plugin install design-taste@taste-skill
+/plugin install brutalist-ui@taste-skill
+/plugin install imagegen-suite@taste-skill
+```
+
+| Plugin | Skills included |
+| --- | --- |
+| `taste-skill` | Everything (all skills below) |
+| `design-taste` | taste-skill (v2) + taste-skill-v1 |
+| `gpt-taste` | gpt-tasteskill |
+| `image-to-code` | image-to-code-skill |
+| `redesign-ui` | redesign-skill |
+| `soft-ui` | soft-skill |
+| `minimalist-ui` | minimalist-skill |
+| `brutalist-ui` | brutalist-skill |
+| `stitch-design` | stitch-skill |
+| `output-enforcement` | output-skill |
+| `imagegen-web` | imagegen-frontend-web |
+| `imagegen-mobile` | imagegen-frontend-mobile |
+| `brandkit` | brandkit |
+| `imagegen-suite` | all three image-generation skills |
+
+The same commands work with the `claude plugin` CLI, e.g. `claude plugin install soft-ui@taste-skill`.
+
 ### Updating from the previous version
 
 The default `taste-skill` (install name `design-taste-frontend`) is now **v2 (experimental)**, a substantial rewrite of the original v1. If you already have v1 installed, just re-run the install command and you will be upgraded:
