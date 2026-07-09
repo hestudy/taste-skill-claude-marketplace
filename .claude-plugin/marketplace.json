@@ -1,6 +1,7 @@
 {
   "name": "taste-skill",
-  "description": "Taste skill library for Claude Code — frontend design, image-to-code, and aesthetic skills",
+  "description": "Taste skill library for Claude Code — frontend design, image-to-code, and aesthetic skills. Install the full bundle or pick individual skills as standalone plugins.",
+  "version": "1.1.0",
   "owner": {
     "name": "leonxlnx",
     "email": ""
@@ -8,13 +9,202 @@
   "plugins": [
     {
       "name": "taste-skill",
-      "description": "Frontend design taste skills including brutalist, minimalist, soft, redesign, stitch, and more",
-      "version": "1.0.0",
+      "description": "Full bundle: every taste-skill design skill in one plugin — anti-slop frontend defaults, style variants (soft, minimalist, brutalist), redesign and image-to-code workflows, and image-generation skills (web, mobile, brand kits).",
+      "version": "1.1.0",
       "source": "./",
       "author": {
         "name": "leonxlnx",
         "email": ""
-      }
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["frontend", "design", "taste", "ui", "bundle"]
+    },
+    {
+      "name": "design-taste",
+      "description": "The core anti-slop frontend skill (v2 experimental) plus the preserved v1. Reads the brief, infers the design language, and tunes VARIANCE / MOTION / DENSITY dials for landing pages, portfolios, and redesigns.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["frontend", "design", "anti-slop", "landing-page"],
+      "skills": ["./skills/taste-skill", "./skills/taste-skill-v1"]
+    },
+    {
+      "name": "gpt-taste",
+      "description": "Stricter GPT/Codex-oriented variant: Python-driven layout randomization, strict AIDA page structure, gapless bento grids, and advanced GSAP scroll motion enforcement.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["frontend", "design", "gsap", "motion"],
+      "skills": ["./skills/gpt-tasteskill"]
+    },
+    {
+      "name": "image-to-code",
+      "description": "Image-first website pipeline: generate design reference images, deeply analyze them, then implement the frontend to match as closely as possible.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["frontend", "image-to-code", "design", "workflow"],
+      "skills": ["./skills/image-to-code-skill"]
+    },
+    {
+      "name": "redesign-ui",
+      "description": "Upgrades existing websites and apps to premium quality: audits the current design, identifies generic AI patterns, then fixes layout, spacing, hierarchy, and styling.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["frontend", "redesign", "refactor", "ui"],
+      "skills": ["./skills/redesign-skill"]
+    },
+    {
+      "name": "soft-ui",
+      "description": "High-end agency look: polished, calm, expensive UI with softer contrast, generous whitespace, premium fonts, and spring motion.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["frontend", "design", "soft", "premium"],
+      "skills": ["./skills/soft-skill"]
+    },
+    {
+      "name": "minimalist-ui",
+      "description": "Clean editorial product UI (Notion/Linear vibes): warm monochrome palette, typographic contrast, flat bento grids, crisp structure.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["frontend", "design", "minimalist", "editorial"],
+      "skills": ["./skills/minimalist-skill"]
+    },
+    {
+      "name": "brutalist-ui",
+      "description": "Industrial brutalism: Swiss typographic print fused with tactical terminal aesthetics — rigid grids, extreme type scale contrast, utilitarian color, analog degradation effects.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["frontend", "design", "brutalist", "swiss"],
+      "skills": ["./skills/brutalist-skill"]
+    },
+    {
+      "name": "stitch-design",
+      "description": "Google Stitch-compatible semantic design system rules, including the optional agent-friendly DESIGN.md export format.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["design", "stitch", "design-system"],
+      "skills": ["./skills/stitch-skill"]
+    },
+    {
+      "name": "output-enforcement",
+      "description": "Overrides default LLM truncation behavior: enforces complete code generation, bans placeholder comments, and handles token-limit continuations.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["output", "completeness", "anti-truncation"],
+      "skills": ["./skills/output-skill"]
+    },
+    {
+      "name": "imagegen-web",
+      "description": "Image generation for website comps: hero, landing, and multi-section design references with strong typography, spacing, and anti-slop art direction.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["image-generation", "design", "web", "mockup"],
+      "skills": ["./skills/imagegen-frontend-web"]
+    },
+    {
+      "name": "imagegen-mobile",
+      "description": "Image generation for mobile screens and flows: iOS/Android/cross-platform concepts, device mockups, readable type, coherent screen sets.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["image-generation", "design", "mobile", "mockup"],
+      "skills": ["./skills/imagegen-frontend-mobile"]
+    },
+    {
+      "name": "brandkit",
+      "description": "Premium brand-kit image generation: brand-guidelines boards, logo systems, identity decks, and visual-world presentations across categories.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["image-generation", "branding", "logo", "identity"],
+      "skills": ["./skills/brandkit"]
+    },
+    {
+      "name": "imagegen-suite",
+      "description": "All three image-generation skills in one plugin: website comps, mobile screens and flows, and premium brand-kit boards.",
+      "version": "1.1.0",
+      "source": "./",
+      "author": {
+        "name": "leonxlnx",
+        "email": ""
+      },
+      "license": "MIT",
+      "category": "design",
+      "keywords": ["image-generation", "design", "bundle"],
+      "skills": [
+        "./skills/imagegen-frontend-web",
+        "./skills/imagegen-frontend-mobile",
+        "./skills/brandkit"
+      ]
     }
   ]
 }
