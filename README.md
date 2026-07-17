@@ -31,6 +31,10 @@
 
 <p align="center"><sub><a href="https://github.com/sponsors/Leonxlnx">Become a sponsor</a></sub></p>
 
+<!-- CLAUDE-FORK-NOTE:START -->
+> **Claude Code marketplace fork** of [`Leonxlnx/taste-skill`](https://github.com/Leonxlnx/taste-skill). Skill content tracks upstream; this repo adds an expanded [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) so you can install the full bundle or individual skills as plugins. Upstream is synced on a schedule via GitHub Actions.
+<!-- CLAUDE-FORK-NOTE:END -->
+
 Portable **Agent Skills** that upgrade AI-built interfaces: stronger layout, typography, motion, and spacing instead of boilerplate-looking UIs. This repo also includes **image-generation skills** for reference boards (web, mobile, brand kits). Pair them with **ChatGPT Images** or similar generators, then hand the frames to Codex, Cursor, or Claude Code for implementation.
 
 <p align="center">
@@ -72,6 +76,100 @@ npx skills add https://github.com/Leonxlnx/taste-skill --skill "design-taste-fro
 ```
 
 You can also copy any `SKILL.md` into your project or paste it into ChatGPT / Codex conversations.
+
+<!-- CLAUDE-MARKETPLACE-INSTALL:START -->
+### Claude Code plugin marketplace
+
+This repository is a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) built on top of upstream Taste Skill. Prefer this path if you use Claude Code.
+
+#### 1. Add the marketplace
+
+Inside Claude Code:
+
+```
+/plugin marketplace add hestudy/taste-skill-claude-marketplace
+```
+
+Or with the CLI:
+
+```bash
+claude plugin marketplace add hestudy/taste-skill-claude-marketplace
+```
+
+#### 2. Install plugins
+
+Install everything in one plugin:
+
+```
+/plugin install taste-skill@taste-skill
+```
+
+Or install exactly the skills you want:
+
+```
+/plugin install design-taste@taste-skill
+/plugin install brutalist-ui@taste-skill
+/plugin install imagegen-suite@taste-skill
+```
+
+CLI equivalents:
+
+```bash
+claude plugin install taste-skill@taste-skill
+claude plugin install design-taste@taste-skill
+claude plugin install soft-ui@taste-skill
+```
+
+You can also browse and install interactively with `/plugin` (Discover / Installed / Marketplaces tabs).
+
+| Plugin | Skills included |
+| --- | --- |
+| `taste-skill` | Everything (all skills below) |
+| `design-taste` | taste-skill (v2) + taste-skill-v1 |
+| `gpt-taste` | gpt-tasteskill |
+| `image-to-code` | image-to-code-skill |
+| `redesign-ui` | redesign-skill |
+| `soft-ui` | soft-skill |
+| `minimalist-ui` | minimalist-skill |
+| `brutalist-ui` | brutalist-skill |
+| `stitch-design` | stitch-skill |
+| `output-enforcement` | output-skill |
+| `imagegen-web` | imagegen-frontend-web |
+| `imagegen-mobile` | imagegen-frontend-mobile |
+| `brandkit` | brandkit |
+| `imagegen-suite` | all three image-generation skills |
+
+#### 3. Update after upstream syncs
+
+When this marketplace pulls new skill content from upstream:
+
+```
+/plugin marketplace update taste-skill
+```
+
+Then reload plugins if needed: `/reload-plugins`.
+
+#### 4. Optional: share with a team project
+
+Add the marketplace for collaborators via `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "taste-skill": {
+      "source": {
+        "source": "github",
+        "repo": "hestudy/taste-skill-claude-marketplace"
+      }
+    }
+  }
+}
+```
+
+Team members who trust the repo can then install plugins with `/plugin install <name>@taste-skill`.
+
+**FAQ:** Add the marketplace once, then install with `/plugin install taste-skill@taste-skill` (full bundle) or any plugin from the table above.
+<!-- CLAUDE-MARKETPLACE-INSTALL:END -->
 
 ### Updating from the previous version
 
@@ -194,6 +292,19 @@ If Taste Skill helps you, consider sponsoring:
 ## Research
 
 Background writing that shaped these skills lives in [`research/`](research/).
+
+<!-- CLAUDE-FORK-DOCS:START -->
+## Upstream sync
+
+Skill content is kept in sync with [`Leonxlnx/taste-skill`](https://github.com/Leonxlnx/taste-skill) by [`.github/workflows/sync-upstream.yml`](.github/workflows/sync-upstream.yml):
+
+- Runs daily at 06:00 UTC and via manual `workflow_dispatch`
+- Default mode is **`direct`** (merges upstream straight into `main`). Choose `pr` if you want a review branch instead.
+- Always starts from the latest `main` (so sync never reuses a stale day-branch script)
+- Preserves this fork's Claude marketplace files (`.claude-plugin/`) and README blocks marked by `CLAUDE-FORK-NOTE`, `CLAUDE-MARKETPLACE-INSTALL`, and `CLAUDE-FORK-DOCS`
+
+Optional: set secret `SYNC_UPSTREAM_TOKEN` (PAT with `contents` + `pull-requests` write) if you use `mode=pr` and the default `GITHUB_TOKEN` cannot create pull requests.
+<!-- CLAUDE-FORK-DOCS:END -->
 
 ## Common Questions
 
