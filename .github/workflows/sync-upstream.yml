@@ -1,0 +1,130 @@
+name: Sync upstream
+
+on:
+  schedule:
+    # Daily at 06:00 UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Detect upstream changes
+        id: detect
+        env:
+          UPSTREAM_REPO: https://github.com/Leonxlnx/taste-skill.git
+          UPSTREAM_BRANCH: main
+        run: |
+          set -euo pipefail
+          git remote add upstream "$UPSTREAM_REPO" 2>/dev/null || git remote set-url upstream "$UPSTREAM_REPO"
+          git fetch upstream "$UPSTREAM_BRANCH"
+          COUNT="$(git rev-list --count "HEAD..upstream/${UPSTREAM_BRANCH}")"
+          echo "commit_count=${COUNT}" >> "$GITHUB_OUTPUT"
+          if [[ "$COUNT" -eq 0 ]]; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "Already up to date with upstream/${UPSTREAM_BRANCH}."
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+            echo "Found ${COUNT} new upstream commit(s)."
+          fi
+
+      - name: Create sync branch and merge upstream
+        if: steps.detect.outputs.up_to_date == 'false'
+        id: merge
+        env:
+          UPSTREAM_REPO: https://github.com/Leonxlnx/taste-skill.git
+          UPSTREAM_BRANCH: main
+          BASE_REF: main
+        run: |
+          set -euo pipefail
+          BRANCH="sync/upstream-$(date -u +%Y%m%d)"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            git fetch origin "$BRANCH"
+            git checkout -B "$BRANCH" "origin/${BRANCH}"
+          else
+            git checkout -B "$BRANCH" origin/main
+          fi
+
+          chmod +x scripts/sync-upstream.sh
+          scripts/sync-upstream.sh
+
+          # Default outputs if the sync script reported already-up-to-date on this branch.
+          grep -q '^changed=' "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
+          grep -q '^conflict=' "$GITHUB_OUTPUT" || echo "conflict=false" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+
+          if grep -q '^changed=true' "$GITHUB_OUTPUT"; then
+            git push -u origin "$BRANCH"
+          else
+            echo "Sync branch already contains upstream; nothing to push."
+          fi
+
+      - name: Open or update pull request
+        if: steps.detect.outputs.up_to_date == 'false' && steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.merge.outputs.branch }}
+          COMMIT_COUNT: ${{ steps.detect.outputs.commit_count }}
+          CONFLICT: ${{ steps.merge.outputs.conflict }}
+        run: |
+          set -euo pipefail
+          TITLE="chore(sync): upstream Leonxlnx/taste-skill (${COMMIT_COUNT} commit(s))"
+
+          if [[ "${CONFLICT:-false}" == "true" ]]; then
+            CONFLICT_NOTE="> Merge conflicts were auto-resolved by the sync script (upstream README + restored marketplace overlay). Please review the diff carefully before merging."
+          else
+            CONFLICT_NOTE="No merge conflicts were reported by the sync script."
+          fi
+
+          BODY="$(cat <<EOF
+          ## Upstream sync
+
+          Automated merge from [\`Leonxlnx/taste-skill\`](https://github.com/Leonxlnx/taste-skill) \`main\`.
+
+          - New upstream commits: **${COMMIT_COUNT}**
+          - Claude marketplace overlay (\`.claude-plugin/\`) was restored after the merge
+          - README fork overlays were preserved (\`CLAUDE-FORK-NOTE\`, \`CLAUDE-MARKETPLACE-INSTALL\`, \`CLAUDE-FORK-DOCS\`)
+
+          ${CONFLICT_NOTE}
+
+          After merging, Claude Code users can refresh with:
+
+          \`\`\`
+          /plugin marketplace update taste-skill
+          \`\`\`
+          EOF
+          )"
+
+          BODY="$(printf '%s\n' "$BODY" | sed -E 's/^ {10}//')"
+
+          EXISTING="$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          if [[ -n "$EXISTING" ]]; then
+            gh pr edit "$EXISTING" --title "$TITLE" --body "$BODY"
+            echo "Updated PR #${EXISTING}"
+          else
+            if gh label list --json name --jq '.[].name' | grep -Fxq 'upstream-sync'; then
+              gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY" --label "upstream-sync"
+            else
+              gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
+            fi
+          fi

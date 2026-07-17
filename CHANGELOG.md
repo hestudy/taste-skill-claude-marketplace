@@ -8,6 +8,8 @@ All notable changes to taste-skill live here. The repo follows SemVer-ish discip
 
 ### Repo
 
+- **Claude Code marketplace install docs** in README: add marketplace, install full/individual plugins, CLI equivalents, update/reload, and optional team `extraKnownMarketplaces` settings. Marked with `CLAUDE-MARKETPLACE-INSTALL` for sync preservation.
+- **Scheduled upstream sync** via `.github/workflows/sync-upstream.yml` + `scripts/sync-upstream.sh`: daily merge from `Leonxlnx/taste-skill`, restore `.claude-plugin/` overlay and README install block, open/update a PR.
 - **Expanded the Claude Code plugin marketplace** (`.claude-plugin/marketplace.json`, marketplace version 1.1.0). Besides the all-in-one `taste-skill` plugin, every skill is now installable as its own plugin (`design-taste`, `gpt-taste`, `image-to-code`, `redesign-ui`, `soft-ui`, `minimalist-ui`, `brutalist-ui`, `stitch-design`, `output-enforcement`, `imagegen-web`, `imagegen-mobile`, `brandkit`), plus an `imagegen-suite` bundle for the three image-generation skills. See the README's "Claude Code plugin marketplace" section for install commands.
 - `taste-skill` (install name `design-taste-frontend`) is now **v2 (experimental)**. The previous v1 is preserved as `taste-skill-v1` (install name `design-taste-frontend-v1`).
 - New `CHANGELOG.md` (this file).
