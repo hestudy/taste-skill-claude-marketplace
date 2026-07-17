@@ -303,11 +303,12 @@ Background writing that shaped these skills lives in [`research/`](research/).
 
 Skill content is kept in sync with [`Leonxlnx/taste-skill`](https://github.com/Leonxlnx/taste-skill) by [`.github/workflows/sync-upstream.yml`](.github/workflows/sync-upstream.yml):
 
-- Runs on a daily schedule and via manual `workflow_dispatch`
-- Opens a pull request when upstream `main` has new commits (or use `mode=direct` to push to `main`)
+- Runs daily at 06:00 UTC and via manual `workflow_dispatch`
+- Default mode is **`direct`** (merges upstream straight into `main`). Choose `pr` if you want a review branch instead.
+- Always starts from the latest `main` (so sync never reuses a stale day-branch script)
 - Preserves this fork's Claude marketplace files (`.claude-plugin/`) and README blocks marked by `CLAUDE-FORK-NOTE`, `CLAUDE-MARKETPLACE-INSTALL`, and `CLAUDE-FORK-DOCS`
 
-If the workflow can push a sync branch but fails to open the PR (`Resource not accessible by integration`), enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests**, or add a `SYNC_UPSTREAM_TOKEN` secret (PAT with `contents` + `pull-requests` write).
+Optional: set secret `SYNC_UPSTREAM_TOKEN` (PAT with `contents` + `pull-requests` write) if you use `mode=pr` and the default `GITHUB_TOKEN` cannot create pull requests.
 <!-- CLAUDE-FORK-DOCS:END -->
 
 ## Common Questions

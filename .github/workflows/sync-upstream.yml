@@ -9,11 +9,13 @@ on:
       mode:
         description: "How to land upstream changes"
         required: true
-        default: pr
+        # direct is the reliable default in this repo: GITHUB_TOKEN cannot create PRs
+        # unless "Allow GitHub Actions to create and approve pull requests" is enabled.
+        default: direct
         type: choice
         options:
-          - pr
           - direct
+          - pr
 
 permissions:
   contents: write
@@ -31,9 +33,6 @@ jobs:
       - name: Resolve token and mode
         id: meta
         env:
-          # Optional PAT / fine-grained token with contents+pull_requests.
-          # Needed when repo setting "Allow GitHub Actions to create and approve
-          # pull requests" is off (GITHUB_TOKEN then cannot create PRs).
           SYNC_TOKEN: ${{ secrets.SYNC_UPSTREAM_TOKEN }}
         run: |
           set -euo pipefail
@@ -42,10 +41,10 @@ jobs:
             echo "Using secrets.SYNC_UPSTREAM_TOKEN for git + gh."
           else
             echo "token_source=github_token" >> "$GITHUB_OUTPUT"
-            echo "Using GITHUB_TOKEN (enable Actions PR permission or set SYNC_UPSTREAM_TOKEN if PR creation fails)."
+            echo "Using GITHUB_TOKEN."
           fi
 
-          MODE="${{ github.event.inputs.mode || 'pr' }}"
+          MODE="${{ github.event.inputs.mode || 'direct' }}"
           echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout
@@ -68,72 +67,59 @@ jobs:
           set -euo pipefail
           git remote add upstream "$UPSTREAM_REPO" 2>/dev/null || git remote set-url upstream "$UPSTREAM_REPO"
           git fetch upstream "$UPSTREAM_BRANCH"
-          COUNT="$(git rev-list --count "HEAD..upstream/${UPSTREAM_BRANCH}")"
+          git fetch origin main
+          COUNT="$(git rev-list --count "origin/main..upstream/${UPSTREAM_BRANCH}")"
           echo "commit_count=${COUNT}" >> "$GITHUB_OUTPUT"
           if [[ "$COUNT" -eq 0 ]]; then
             echo "up_to_date=true" >> "$GITHUB_OUTPUT"
-            echo "Already up to date with upstream/${UPSTREAM_BRANCH}."
+            echo "origin/main is already up to date with upstream/${UPSTREAM_BRANCH}."
           else
             echo "up_to_date=false" >> "$GITHUB_OUTPUT"
-            echo "Found ${COUNT} new upstream commit(s)."
+            echo "Found ${COUNT} new upstream commit(s) vs origin/main."
           fi
 
-      - name: Merge upstream (PR branch or direct to main)
+      - name: Merge upstream
         if: steps.detect.outputs.up_to_date == 'false'
         id: merge
         env:
           UPSTREAM_REPO: https://github.com/Leonxlnx/taste-skill.git
           UPSTREAM_BRANCH: main
-          BASE_REF: main
           MODE: ${{ steps.meta.outputs.mode }}
         run: |
           set -euo pipefail
 
+          # Always start from latest main so we run the newest sync script /
+          # marketplace overlay, never a stale day-branch copy.
+          git checkout -B "__sync_workspace" origin/main
+          chmod +x scripts/sync-upstream.sh
+          scripts/sync-upstream.sh
+
+          CHANGED="$(grep -E '^changed=' "$GITHUB_OUTPUT" | tail -n1 | cut -d= -f2 || true)"
+          CONFLICT="$(grep -E '^conflict=' "$GITHUB_OUTPUT" | tail -n1 | cut -d= -f2 || true)"
+          CHANGED="${CHANGED:-false}"
+          CONFLICT="${CONFLICT:-false}"
+          echo "changed=${CHANGED}" >> "$GITHUB_OUTPUT"
+          echo "conflict=${CONFLICT}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$CHANGED" != "true" ]]; then
+            echo "Sync script reported no changes; nothing to publish."
+            echo "branch=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           if [[ "$MODE" == "direct" ]]; then
-            git checkout -B main origin/main
-            chmod +x scripts/sync-upstream.sh
-            scripts/sync-upstream.sh
-
-            grep -q '^changed=' "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
-            grep -q '^conflict=' "$GITHUB_OUTPUT" || echo "conflict=false" >> "$GITHUB_OUTPUT"
+            git branch -M main
+            git push origin main
             echo "branch=main" >> "$GITHUB_OUTPUT"
-
-            if grep -q '^changed=true' "$GITHUB_OUTPUT"; then
-              git push origin main
-              echo "Pushed upstream merge directly to main."
-            else
-              echo "Nothing to push."
-            fi
+            echo "Pushed upstream merge directly to main."
             exit 0
           fi
 
           BRANCH="sync/upstream-$(date -u +%Y%m%d)"
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            git fetch origin "$BRANCH"
-            git checkout -B "$BRANCH" "origin/${BRANCH}"
-          else
-            git checkout -B "$BRANCH" origin/main
-          fi
-
-          chmod +x scripts/sync-upstream.sh
-          scripts/sync-upstream.sh
-
-          grep -q '^changed=' "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
-          grep -q '^conflict=' "$GITHUB_OUTPUT" || echo "conflict=false" >> "$GITHUB_OUTPUT"
+          git branch -M "$BRANCH"
+          git push -u origin "$BRANCH" --force-with-lease
           echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
-
-          if grep -q '^changed=true' "$GITHUB_OUTPUT"; then
-            git push -u origin "$BRANCH"
-          else
-            echo "Sync branch already contains upstream; nothing to push."
-            # Previous run may have left a sync branch that is still ahead of main
-            # (e.g. PR create failed). Still surface it for the PR step.
-            AHEAD_OF_MAIN="$(git rev-list --count "origin/main..HEAD")"
-            if [[ "${AHEAD_OF_MAIN}" -gt 0 ]]; then
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-              echo "Branch ${BRANCH} is ${AHEAD_OF_MAIN} commit(s) ahead of main; will open/update PR."
-            fi
-          fi
+          echo "Published sync branch ${BRANCH}."
 
       - name: Open or update pull request
         if: >-
@@ -175,7 +161,6 @@ jobs:
           \`\`\`
           EOF
           )"
-
           BODY="$(printf '%s\n' "$BODY" | sed -E 's/^ {10}//')"
           COMPARE_URL="https://github.com/${REPO}/compare/main...${BRANCH}?expand=1"
 
@@ -183,50 +168,32 @@ jobs:
           if [[ -n "$EXISTING" ]]; then
             gh pr edit "$EXISTING" --title "$TITLE" --body "$BODY"
             echo "Updated PR #${EXISTING}"
-            echo "pr_url=https://github.com/${REPO}/pull/${EXISTING}" >> "$GITHUB_OUTPUT"
             echo "pr_created=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           set +e
-          if gh label list --json name --jq '.[].name' 2>/dev/null | grep -Fxq 'upstream-sync'; then
-            CREATE_OUT="$(gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY" --label "upstream-sync" 2>&1)"
-          else
-            CREATE_OUT="$(gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY" 2>&1)"
-          fi
+          CREATE_OUT="$(gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY" 2>&1)"
           CREATE_STATUS=$?
           set -e
 
           if [[ "$CREATE_STATUS" -eq 0 ]]; then
             echo "$CREATE_OUT"
-            echo "pr_url=${CREATE_OUT}" >> "$GITHUB_OUTPUT"
             echo "pr_created=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "pr_created=false" >> "$GITHUB_OUTPUT"
-          echo "compare_url=${COMPARE_URL}" >> "$GITHUB_OUTPUT"
-
           {
-            echo "## Upstream sync branch pushed, but PR was not created"
-            echo
-            echo "GitHub rejected PR creation with:"
+            echo "## Sync branch published, but PR was not created"
             echo
             echo '```'
             echo "$CREATE_OUT"
             echo '```'
             echo
-            echo "Branch \`${BRANCH}\` is already on the remote. Open a PR manually:"
+            echo "Open manually: ${COMPARE_URL}"
             echo
-            echo "- ${COMPARE_URL}"
-            echo
-            echo "### Fix options"
-            echo
-            echo "1. **Repo setting (recommended for GITHUB_TOKEN):** Settings → Actions → General → Workflow permissions → enable **Allow GitHub Actions to create and approve pull requests**"
-            echo "2. **PAT secret:** create a classic/fine-grained token with \`contents:write\` + \`pull-requests:write\`, add repo secret \`SYNC_UPSTREAM_TOKEN\`, re-run the workflow"
-            echo "3. **Direct mode:** re-run with \`mode=direct\` to push the upstream merge straight to \`main\` (no PR)"
+            echo "Or re-run with \`mode=direct\`, or set secret \`SYNC_UPSTREAM_TOKEN\`, or enable **Allow GitHub Actions to create and approve pull requests**."
           } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "::warning::PR creation failed; sync branch was pushed. See job summary for a compare link and fix options."
-          # Do not fail the job: the sync itself succeeded.
+          echo "::warning::PR creation failed; sync branch was pushed. See job summary."
           exit 0
