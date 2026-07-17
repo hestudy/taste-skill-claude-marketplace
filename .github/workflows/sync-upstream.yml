@@ -5,10 +5,20 @@ on:
     # Daily at 06:00 UTC
     - cron: "0 6 * * *"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "How to land upstream changes"
+        required: true
+        default: pr
+        type: choice
+        options:
+          - pr
+          - direct
 
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 concurrency:
   group: sync-upstream
@@ -18,11 +28,31 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve token and mode
+        id: meta
+        env:
+          # Optional PAT / fine-grained token with contents+pull_requests.
+          # Needed when repo setting "Allow GitHub Actions to create and approve
+          # pull requests" is off (GITHUB_TOKEN then cannot create PRs).
+          SYNC_TOKEN: ${{ secrets.SYNC_UPSTREAM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${SYNC_TOKEN:-}" ]]; then
+            echo "token_source=secret" >> "$GITHUB_OUTPUT"
+            echo "Using secrets.SYNC_UPSTREAM_TOKEN for git + gh."
+          else
+            echo "token_source=github_token" >> "$GITHUB_OUTPUT"
+            echo "Using GITHUB_TOKEN (enable Actions PR permission or set SYNC_UPSTREAM_TOKEN if PR creation fails)."
+          fi
+
+          MODE="${{ github.event.inputs.mode || 'pr' }}"
+          echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SYNC_UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Configure git identity
         run: |
@@ -48,15 +78,35 @@ jobs:
             echo "Found ${COUNT} new upstream commit(s)."
           fi
 
-      - name: Create sync branch and merge upstream
+      - name: Merge upstream (PR branch or direct to main)
         if: steps.detect.outputs.up_to_date == 'false'
         id: merge
         env:
           UPSTREAM_REPO: https://github.com/Leonxlnx/taste-skill.git
           UPSTREAM_BRANCH: main
           BASE_REF: main
+          MODE: ${{ steps.meta.outputs.mode }}
         run: |
           set -euo pipefail
+
+          if [[ "$MODE" == "direct" ]]; then
+            git checkout -B main origin/main
+            chmod +x scripts/sync-upstream.sh
+            scripts/sync-upstream.sh
+
+            grep -q '^changed=' "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
+            grep -q '^conflict=' "$GITHUB_OUTPUT" || echo "conflict=false" >> "$GITHUB_OUTPUT"
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+
+            if grep -q '^changed=true' "$GITHUB_OUTPUT"; then
+              git push origin main
+              echo "Pushed upstream merge directly to main."
+            else
+              echo "Nothing to push."
+            fi
+            exit 0
+          fi
+
           BRANCH="sync/upstream-$(date -u +%Y%m%d)"
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             git fetch origin "$BRANCH"
@@ -68,7 +118,6 @@ jobs:
           chmod +x scripts/sync-upstream.sh
           scripts/sync-upstream.sh
 
-          # Default outputs if the sync script reported already-up-to-date on this branch.
           grep -q '^changed=' "$GITHUB_OUTPUT" || echo "changed=false" >> "$GITHUB_OUTPUT"
           grep -q '^conflict=' "$GITHUB_OUTPUT" || echo "conflict=false" >> "$GITHUB_OUTPUT"
           echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
@@ -80,12 +129,17 @@ jobs:
           fi
 
       - name: Open or update pull request
-        if: steps.detect.outputs.up_to_date == 'false' && steps.merge.outputs.changed == 'true'
+        if: >-
+          steps.detect.outputs.up_to_date == 'false'
+          && steps.merge.outputs.changed == 'true'
+          && steps.meta.outputs.mode == 'pr'
+        id: pr
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SYNC_UPSTREAM_TOKEN || secrets.GITHUB_TOKEN }}
           BRANCH: ${{ steps.merge.outputs.branch }}
           COMMIT_COUNT: ${{ steps.detect.outputs.commit_count }}
           CONFLICT: ${{ steps.merge.outputs.conflict }}
+          REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           TITLE="chore(sync): upstream Leonxlnx/taste-skill (${COMMIT_COUNT} commit(s))"
@@ -116,15 +170,56 @@ jobs:
           )"
 
           BODY="$(printf '%s\n' "$BODY" | sed -E 's/^ {10}//')"
+          COMPARE_URL="https://github.com/${REPO}/compare/main...${BRANCH}?expand=1"
 
-          EXISTING="$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          EXISTING="$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number // empty' || true)"
           if [[ -n "$EXISTING" ]]; then
             gh pr edit "$EXISTING" --title "$TITLE" --body "$BODY"
             echo "Updated PR #${EXISTING}"
-          else
-            if gh label list --json name --jq '.[].name' | grep -Fxq 'upstream-sync'; then
-              gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY" --label "upstream-sync"
-            else
-              gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
-            fi
+            echo "pr_url=https://github.com/${REPO}/pull/${EXISTING}" >> "$GITHUB_OUTPUT"
+            echo "pr_created=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          set +e
+          if gh label list --json name --jq '.[].name' 2>/dev/null | grep -Fxq 'upstream-sync'; then
+            CREATE_OUT="$(gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY" --label "upstream-sync" 2>&1)"
+          else
+            CREATE_OUT="$(gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY" 2>&1)"
+          fi
+          CREATE_STATUS=$?
+          set -e
+
+          if [[ "$CREATE_STATUS" -eq 0 ]]; then
+            echo "$CREATE_OUT"
+            echo "pr_url=${CREATE_OUT}" >> "$GITHUB_OUTPUT"
+            echo "pr_created=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "pr_created=false" >> "$GITHUB_OUTPUT"
+          echo "compare_url=${COMPARE_URL}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Upstream sync branch pushed, but PR was not created"
+            echo
+            echo "GitHub rejected PR creation with:"
+            echo
+            echo '```'
+            echo "$CREATE_OUT"
+            echo '```'
+            echo
+            echo "Branch \`${BRANCH}\` is already on the remote. Open a PR manually:"
+            echo
+            echo "- ${COMPARE_URL}"
+            echo
+            echo "### Fix options"
+            echo
+            echo "1. **Repo setting (recommended for GITHUB_TOKEN):** Settings → Actions → General → Workflow permissions → enable **Allow GitHub Actions to create and approve pull requests**"
+            echo "2. **PAT secret:** create a classic/fine-grained token with \`contents:write\` + \`pull-requests:write\`, add repo secret \`SYNC_UPSTREAM_TOKEN\`, re-run the workflow"
+            echo "3. **Direct mode:** re-run with \`mode=direct\` to push the upstream merge straight to \`main\` (no PR)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::warning::PR creation failed; sync branch was pushed. See job summary for a compare link and fix options."
+          # Do not fail the job: the sync itself succeeded.
+          exit 0
