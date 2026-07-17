@@ -27,6 +27,10 @@
 
 <p align="center"><sub><a href="https://github.com/sponsors/Leonxlnx">Become a sponsor</a></sub></p>
 
+<!-- CLAUDE-FORK-NOTE:START -->
+> **Claude Code marketplace fork** of [`Leonxlnx/taste-skill`](https://github.com/Leonxlnx/taste-skill). Skill content tracks upstream; this repo adds an expanded [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) so you can install the full bundle or individual skills as plugins. Upstream is synced on a schedule via GitHub Actions.
+<!-- CLAUDE-FORK-NOTE:END -->
+
 Portable **Agent Skills** that upgrade AI-built interfaces: stronger layout, typography, motion, and spacing instead of boilerplate-looking UIs. This repo also includes **image-generation skills** for reference boards (web, mobile, brand kits). Pair them with **ChatGPT Images** or similar generators, then hand the frames to Codex, Cursor, or Claude Code for implementation.
 
 <p align="center">
@@ -69,13 +73,26 @@ npx skills add https://github.com/Leonxlnx/taste-skill --skill "design-taste-fro
 
 You can also copy any `SKILL.md` into your project or paste it into ChatGPT / Codex conversations.
 
+<!-- CLAUDE-MARKETPLACE-INSTALL:START -->
 ### Claude Code plugin marketplace
 
-This repo is also a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces). Add it once, then install the full bundle or individual skills as plugins:
+This repository is a [Claude Code plugin marketplace](https://code.claude.com/docs/en/plugin-marketplaces) built on top of upstream Taste Skill. Prefer this path if you use Claude Code.
+
+#### 1. Add the marketplace
+
+Inside Claude Code:
 
 ```
 /plugin marketplace add hestudy/taste-skill-claude-marketplace
 ```
+
+Or with the CLI:
+
+```bash
+claude plugin marketplace add hestudy/taste-skill-claude-marketplace
+```
+
+#### 2. Install plugins
 
 Install everything in one plugin:
 
@@ -90,6 +107,16 @@ Or install exactly the skills you want:
 /plugin install brutalist-ui@taste-skill
 /plugin install imagegen-suite@taste-skill
 ```
+
+CLI equivalents:
+
+```bash
+claude plugin install taste-skill@taste-skill
+claude plugin install design-taste@taste-skill
+claude plugin install soft-ui@taste-skill
+```
+
+You can also browse and install interactively with `/plugin` (Discover / Installed / Marketplaces tabs).
 
 | Plugin | Skills included |
 | --- | --- |
@@ -108,7 +135,37 @@ Or install exactly the skills you want:
 | `brandkit` | brandkit |
 | `imagegen-suite` | all three image-generation skills |
 
-The same commands work with the `claude plugin` CLI, e.g. `claude plugin install soft-ui@taste-skill`.
+#### 3. Update after upstream syncs
+
+When this marketplace pulls new skill content from upstream:
+
+```
+/plugin marketplace update taste-skill
+```
+
+Then reload plugins if needed: `/reload-plugins`.
+
+#### 4. Optional: share with a team project
+
+Add the marketplace for collaborators via `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "taste-skill": {
+      "source": {
+        "source": "github",
+        "repo": "hestudy/taste-skill-claude-marketplace"
+      }
+    }
+  }
+}
+```
+
+Team members who trust the repo can then install plugins with `/plugin install <name>@taste-skill`.
+
+**FAQ:** Add the marketplace once, then install with `/plugin install taste-skill@taste-skill` (full bundle) or any plugin from the table above.
+<!-- CLAUDE-MARKETPLACE-INSTALL:END -->
 
 ### Updating from the previous version
 
@@ -241,6 +298,16 @@ Background writing that shaped these skills lives in [`research/`](research/).
  </picture>
 </a>
 
+<!-- CLAUDE-FORK-DOCS:START -->
+## Upstream sync
+
+Skill content is kept in sync with [`Leonxlnx/taste-skill`](https://github.com/Leonxlnx/taste-skill) by [`.github/workflows/sync-upstream.yml`](.github/workflows/sync-upstream.yml):
+
+- Runs on a daily schedule and via manual `workflow_dispatch`
+- Opens a pull request when upstream `main` has new commits
+- Preserves this fork's Claude marketplace files (`.claude-plugin/`) and README blocks marked by `CLAUDE-FORK-NOTE`, `CLAUDE-MARKETPLACE-INSTALL`, and `CLAUDE-FORK-DOCS`
+<!-- CLAUDE-FORK-DOCS:END -->
+
 ## Common Questions
 
 **How is this different from other AI design skills?**  
@@ -250,10 +317,10 @@ Multiple specialized variants, adjustable dials in key skills, anti-repetition r
 Yes. Rules target design intent, not a single framework API.
 
 **What is SKILL.md?**  
-A portable instruction file agents can load automatically; install via `npx skills add` or by copying into a repo or conversation.
+A portable instruction file agents can load automatically; install via `npx skills add`, Claude Code plugins, or by copying into a repo or conversation.
 
 **Do image-generation skills install with `npx skills add`?**  
-Yes. They live under `skills/` alongside the code skills so the same CLI discovers them.
+Yes. They live under `skills/` alongside the code skills so the same CLI discovers them. They are also available as Claude Code plugins (`imagegen-web`, `imagegen-mobile`, `brandkit`, `imagegen-suite`).
 
 ## License
 
