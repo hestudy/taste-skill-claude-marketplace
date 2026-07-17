@@ -126,6 +126,13 @@ jobs:
             git push -u origin "$BRANCH"
           else
             echo "Sync branch already contains upstream; nothing to push."
+            # Previous run may have left a sync branch that is still ahead of main
+            # (e.g. PR create failed). Still surface it for the PR step.
+            AHEAD_OF_MAIN="$(git rev-list --count "origin/main..HEAD")"
+            if [[ "${AHEAD_OF_MAIN}" -gt 0 ]]; then
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "Branch ${BRANCH} is ${AHEAD_OF_MAIN} commit(s) ahead of main; will open/update PR."
+            fi
           fi
 
       - name: Open or update pull request

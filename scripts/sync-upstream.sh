@@ -19,8 +19,15 @@ BLOCKS_DIR=""
 log() { printf '%s\n' "$*"; }
 
 cleanup() {
-  [[ -n "${PRESERVE_DIR}" && -d "${PRESERVE_DIR}" ]] && rm -rf "${PRESERVE_DIR}"
-  [[ -n "${BLOCKS_DIR}" && -d "${BLOCKS_DIR}" ]] && rm -rf "${BLOCKS_DIR}"
+  # Use if/fi (not `[[ ]] &&`) so an empty dir does not make the EXIT trap
+  # return 1 under `set -e` and flip a successful sync into a failed job.
+  if [[ -n "${PRESERVE_DIR}" && -d "${PRESERVE_DIR}" ]]; then
+    rm -rf "${PRESERVE_DIR}"
+  fi
+  if [[ -n "${BLOCKS_DIR}" && -d "${BLOCKS_DIR}" ]]; then
+    rm -rf "${BLOCKS_DIR}"
+  fi
+  return 0
 }
 trap cleanup EXIT
 
